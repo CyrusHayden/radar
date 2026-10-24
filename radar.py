@@ -104,20 +104,37 @@ DEFAULT_CONFIG = {
         "check": {"tool": "vidiq_keyword_research",
                   "arguments": {"mode": "research", "keyword": "{keyword}", "country": "US"}},
     },
-    "google_news": [
-        "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en",
-        "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=en-US&gl=US&ceid=US:en",
-        "https://news.google.com/rss/search?q=economy+OR+inflation+OR+%22federal+reserve%22+when:4d&hl=en-US&gl=US&ceid=US:en",
-    ],
     "google_trends_geo": "US",
-    "science_feeds": [
-        "https://www.sciencedaily.com/rss/top/science.xml",
-        "https://phys.org/rss-feed/breaking/",
-        "https://www.nasa.gov/news-release/feed/",
-        "https://api.quantamagazine.org/feed/",
-    ],
-    "hacker_news_min_points": 250,
-    "per_feed": 12,
+    # Bao lon, chia theo 3 mang cua kenh. Bao khong co RSS -> doc qua Google News "site:".
+    "news_feeds": {
+        "Economics": [
+            "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=en-US&gl=US&ceid=US:en",
+            "https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml",
+            "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+            "https://feeds.npr.org/1006/rss.xml",
+            "https://feeds.bbci.co.uk/news/business/rss.xml",
+            "https://www.cnbc.com/id/20910258/device/rss/rss.html",
+            "https://news.google.com/rss/search?q=site:usatoday.com/money+when:4d&hl=en-US&gl=US&ceid=US:en",
+        ],
+        "Science & space": [
+            "https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=en-US&gl=US&ceid=US:en",
+            "https://rss.nytimes.com/services/xml/rss/nyt/Science.xml",
+            "https://rss.nytimes.com/services/xml/rss/nyt/Space.xml",
+            "https://feeds.npr.org/1007/rss.xml",
+            "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
+            "https://www.nasa.gov/news-release/feed/",
+            "https://news.google.com/rss/search?q=site:scientificamerican.com+when:4d&hl=en-US&gl=US&ceid=US:en",
+        ],
+        "Nature & psychology": [
+            "https://www.theguardian.com/science/psychology/rss",
+            "https://www.theguardian.com/environment/wildlife/rss",
+            "https://rss.nytimes.com/services/xml/rss/nyt/Well.xml",
+            "https://news.google.com/rss/search?q=site:nationalgeographic.com+when:4d&hl=en-US&gl=US&ceid=US:en",
+            "https://news.google.com/rss/search?q=site:smithsonianmag.com+when:4d&hl=en-US&gl=US&ceid=US:en",
+            "https://news.google.com/rss/search?q=site:usatoday.com+psychology+OR+animals+when:4d&hl=en-US&gl=US&ceid=US:en",
+        ],
+    },
+    "per_feed": 8,
 }
 
 
@@ -243,12 +260,13 @@ def read_feed(url):
 
 def collect_feeds(urls, source, cfg):
     cutoff = NOW - timedelta(days=cfg["lookback_days"])
-    cands, failed = [], 0
+    cands, failed = [], []
     for url in urls:
         try:
             feed = read_feed(url)
         except Exception:
-            failed += 1
+            q = re.search(r"site:([^/+&]+)", url)
+            failed.append(q.group(1) if q else requests.utils.urlparse(url).netloc.replace("www.", ""))
             continue
         n = 0
         for e in feed.entries:
@@ -262,7 +280,7 @@ def collect_feeds(urls, source, cfg):
             n += 1
             if n >= cfg["per_feed"]:
                 break
-    HEALTH[source] = f"{len(cands)} tin" + (f", lỗi {failed}/{len(urls)} feed" if failed else "")
+    HEALTH[source] = f"{len(cands)} tin" + (f", lỗi {len(failed)}/{len(urls)} feed ({', '.join(failed)})" if failed else "")
     return cands
 
 
@@ -327,7 +345,7 @@ def build_keywords(cfg, news):
         try:
             data, _ = ask_gemini(KEYWORD_PROMPT.format(
                 profile=cfg["channel_profile"], seeds=", ".join(seeds) or "(none)", n=cfg["dynamic_keywords"],
-                headlines="\n".join(f"- {c['title']}" for c in news[:150])), cfg["gemini_models"], 0.3)
+                headlines="\n".join(f"- {c['title']}" for c in news[:220])), cfg["gemini_models"], 0.3)
             dyn = [k.strip() for k in data.get("keywords", []) if isinstance(k, str) and k.strip()]
             n_dyn = min(len(dyn), cfg["dynamic_keywords"])
         except Exception:
@@ -728,7 +746,8 @@ BRANCH A - raw signals, each with an ID:
 - "YouTube" = videos far above normal (views vs subscribers, or vs the channel's median) -> proven demand.
 - "Reddit" = what US communities discuss / ask.
 - "Search suggest" = what people type into YouTube/Google search.
-- "Google News" / "Google Trends" = current events. "Science" / "Hacker News" = new discoveries.
+- "News Economics" / "News Science & space" / "News Nature & psychology" = major US/UK outlets (NYT, NPR, BBC,
+  CNBC, USA Today, Guardian, Scientific American, National Geographic, Smithsonian). "Google Trends" = what the US searches today.
 {signals}
 
 BRANCH B - vidIQ research output (cite it with source id "VIDIQ"):
@@ -846,9 +865,8 @@ def main():
 
     # 1. tin tuc
     news = collect_trends(cfg)
-    news += collect_feeds(cfg["google_news"], "Google News", cfg)
-    news += collect_feeds(cfg["science_feeds"], "Science", cfg)
-    news += collect_hn(cfg)
+    for lane, urls in cfg["news_feeds"].items():
+        news += collect_feeds(urls, f"News {lane}", cfg)
     # 2. tu khoa
     log(f"tin tuc: {len(news)} tin")
     keywords = build_keywords(cfg, news)
