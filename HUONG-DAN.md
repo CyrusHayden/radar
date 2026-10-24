@@ -1,6 +1,6 @@
 # Topic Radar v2 – Hướng dẫn cài đặt
 
-Bot chạy **Thứ 2, Thứ 4, Thứ 6 lúc khoảng 7:17 sáng** (giờ VN) trên GitHub Actions, miễn phí, và gửi top 5 chủ đề vào chat riêng với bot Telegram.
+Bot chạy **Thứ 2 và Thứ 5 lúc khoảng 7:17 sáng** (giờ VN) trên GitHub Actions, miễn phí, và gửi top 5 chủ đề vào chat riêng với bot Telegram.
 
 ## Bot làm gì mỗi lần chạy
 1. **Đọc tin:** Google Trends, Google News, tin khoa học, Hacker News.

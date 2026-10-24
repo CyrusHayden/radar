@@ -2,7 +2,7 @@ name: topic-radar
 
 on:
   schedule:
-    - cron: "17 0 * * 1,3,5"   # 07:17 gio VN, Thu 2 / Thu 4 / Thu 6
+    - cron: "17 0 * * 1,4"     # 07:17 gio VN, Thu 2 va Thu 5
   workflow_dispatch: {}        # nut "Run workflow" de chay tay
 
 permissions:
