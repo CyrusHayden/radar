@@ -47,8 +47,32 @@ DRY_RUN = "--dry-run" in sys.argv
 HEALTH = {}  # ten nguon -> ghi chu (chi gui vao Telegram, khong in log)
 
 
+RUN_LOG_FILE = os.path.join(ROOT, "run_log.txt")
+RUNLOG = []  # nhat ky moi lan chay -> run_log.txt (repo public: CHI so lieu, khong tu khoa/chu de)
+T0 = time.time()
+
+
 def log(msg):
-    print(f"[radar] {msg}", flush=True)
+    line = f"[{time.time() - T0:5.0f}s] {msg}"
+    RUNLOG.append(line)
+    print(f"[radar] {line}", flush=True)
+
+
+def write_run_log(status):
+    if DRY_RUN:
+        return
+    local = NOW + timedelta(hours=7)
+    health = " · ".join(f"{k}: {v}" for k, v in HEALTH.items())
+    health = re.sub(r"@\S+", "@***", health)  # an handle kenh
+    block = [f"=== {local:%Y-%m-%d %H:%M} (gio VN) · {os.environ.get('GITHUB_EVENT_NAME', 'local')} · {status} ==="]
+    block += RUNLOG + ([f"nguon: {health}"] if health else []) + [""]
+    old = []
+    if os.path.exists(RUN_LOG_FILE):
+        with open(RUN_LOG_FILE, encoding="utf-8") as f:
+            old = f.read().splitlines()
+    lines = (old + block)[-600:]  # giu khoang 30 lan chay gan nhat
+    with open(RUN_LOG_FILE, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
 
 
 # ================================================================ config / state
@@ -826,17 +850,28 @@ def main():
     news += collect_feeds(cfg["science_feeds"], "Science", cfg)
     news += collect_hn(cfg)
     # 2. tu khoa
+    log(f"tin tuc: {len(news)} tin")
     keywords = build_keywords(cfg, news)
-    log(f"{len(keywords)} tu khoa")
+    log(f"tu khoa: {len(keywords)}")
     # 3. nhanh co ban
-    cands = collect_youtube(cfg, keywords, state) + collect_reddit(cfg, keywords) + collect_suggest(cfg, keywords) + news
+    yt_c = collect_youtube(cfg, keywords, state)
+    log(f"youtube: {len(yt_c)} outlier")
+    rd_c = collect_reddit(cfg, keywords)
+    log(f"reddit: {len(rd_c)} bai")
+    sg_c = collect_suggest(cfg, keywords)
+    log(f"goi y tim kiem: {len(sg_c)}")
+    cands = yt_c + rd_c + sg_c + news
     # 4. nhanh vidIQ
     vq = VidIQBranch(cfg, state)
     vq_text = "(vidIQ not available this run)"
     if vq.connect():
+        log(f"vidiq: ket noi OK, {len(vq.tools)} cong cu")
         got = vq.discover(keywords)
         if got:
             vq_text = f"[tool {got[0]}]\n{got[1]}"
+        log(f"vidiq kham pha: {'OK ' + str(len(got[1])) + ' ky tu' if got else 'khong co ket qua'}")
+    else:
+        log(f"vidiq: khong ket noi ({vq.note})")
 
     seen, uniq = set(), []
     for c in cands:
@@ -849,7 +884,7 @@ def main():
     for i, c in enumerate(uniq, 1):
         c["id"] = f"S{i}"
         by_id[c["id"]] = c
-    log(f"{len(uniq)} tin hieu")
+    log(f"tong tin hieu sau loc trung: {len(uniq)}")
 
     weekday = ["Thứ 2", "Thứ 3", "Thứ 4", "Thứ 5", "Thứ 6", "Thứ 7", "CN"]
     local = NOW + timedelta(hours=7)
@@ -882,10 +917,11 @@ def main():
     try:
         data, model = ask_gemini(prompt, cfg["gemini_models"])
         topics = data["topics"][: cfg["top_n"]]
-        log(f"Gemini chon {len(topics)} chu de")
+        log(f"gemini ({model}) chon {len(topics)} chu de")
         # 6. vidIQ kiem tra lan cuoi
         if vq.client and topics:
             got = vq.check(topics)
+            log(f"vidiq kiem tra: {'OK' if got else 'khong co ket qua'}")
             if got:
                 try:
                     listing = "\n".join(f"{i}. {t.get('topic')} (keyword: {t.get('keyword')})" for i, t in enumerate(topics, 1))
@@ -902,7 +938,7 @@ def main():
                     vq.note += " không đọc được kết quả kiểm tra;"
         msgs = build_messages(topics, by_id, header, footer(model))
     except Exception as e:
-        log("Gemini loi -> gui danh sach tho")
+        log(f"gemini LOI ({clean(str(e), 80)}) -> gui danh sach tho")
         top_yt = sorted([c for c in uniq if c["source"] == "YouTube"], key=lambda c: -c["weight"])[:6]
         top_rd = sorted([c for c in uniq if c["source"] == "Reddit"], key=lambda c: -c["weight"])[:4]
         lines = [f'• <a href="{html.escape(c["url"])}">{esc(c["title"])}</a> — {esc(c["metric"])}' for c in top_yt + top_rd]
@@ -917,12 +953,18 @@ def main():
             state["history"].append({"date": NOW.date().isoformat(),
                                      "topics": [t.get("topic", "") for t in topics], "urls": urls})
         save_state(state)  # luon luu: kenh tu hoc + token vidIQ moi
-        log("da luu state")
+        log(f"da luu state · kenh tu hoc dang theo doi: {len(watchlist(cfg, state))} · vidiq: {vq.client.calls if vq.client else 0} luot goi")
 
 
 if __name__ == "__main__":
+    code = 0
     try:
         main()
+    except SystemExit as e:
+        code = e.code or 0
     except Exception as e:  # khong in traceback (repo public)
-        log(f"LOI: {type(e).__name__}")
-        sys.exit(1)
+        log(f"LOI: {type(e).__name__} o {e.__traceback__.tb_next.tb_frame.f_code.co_name if e.__traceback__.tb_next else '?'}")
+        code = 1
+    log(f"ket thuc sau {time.time() - T0:.0f}s")
+    write_run_log("OK" if code == 0 else "LOI")
+    sys.exit(code)
