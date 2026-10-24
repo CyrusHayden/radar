@@ -783,18 +783,32 @@ def build_messages(topics, by_id, header, footer):
 
 
 def send_telegram(msgs):
-    token, chat = os.environ.get("TELEGRAM_BOT_TOKEN"), os.environ.get("TELEGRAM_CHAT_ID")
-    if DRY_RUN or not (token and chat):
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()
+    chat = os.environ.get("TELEGRAM_CHAT_ID", "").strip()
+    if DRY_RUN:
         for m in msgs:
             print("\n" + "=" * 60 + "\n" + m)
         return
+    if not token or not chat:
+        log("LOI TELEGRAM: thieu Secret " + ("TELEGRAM_BOT_TOKEN" if not token else "TELEGRAM_CHAT_ID"))
+        raise SystemExit(1)
+    ok = 0
     for m in msgs:
-        r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", timeout=30, json={
-            "chat_id": chat, "text": m, "parse_mode": "HTML", "disable_web_page_preview": True})
-        if r.status_code != 200:
-            requests.post(f"https://api.telegram.org/bot{token}/sendMessage", timeout=30, json={
-                "chat_id": chat, "text": re.sub(r"<[^>]+>", "", m), "disable_web_page_preview": True})
+        for payload in ({"chat_id": chat, "text": m, "parse_mode": "HTML", "disable_web_page_preview": True},
+                        {"chat_id": chat, "text": re.sub(r"<[^>]+>", "", m), "disable_web_page_preview": True}):
+            r = requests.post(f"https://api.telegram.org/bot{token}/sendMessage", timeout=30, json=payload)
+            if r.status_code == 200:
+                ok += 1
+                break
+            try:
+                desc = r.json().get("description", "")
+            except ValueError:
+                desc = ""
+            log(f"LOI TELEGRAM: HTTP {r.status_code} {desc}")
         time.sleep(1)
+    log(f"da gui {ok}/{len(msgs)} tin Telegram")
+    if ok == 0:
+        raise SystemExit(1)
 
 
 # ================================================================ main
