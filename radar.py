@@ -282,9 +282,12 @@ KEYWORD_PROMPT = """You pick YouTube search keywords for this channel:
 
 Fixed seed keywords (already used, do not repeat): {seeds}
 
-Below are this week's headlines (news, Google Trends, science). Extract {n} NEW search keywords
-(2-5 words each, the way a US viewer would type them into YouTube) that could become a
-25-30 minute explainer for this channel. Skip sports, celebrities, crime, gossip.
+Below are this week's headlines (news, Google Trends, science). Use them only as inspiration:
+turn them into {n} NEW, BROAD, EVERGREEN curiosity keywords (2-6 words, the way a US viewer would type
+them into YouTube, ideally "why / how / what if" questions) that will still be searched years from now.
+Example: headline "Fed holds rates at 5%" -> keyword "why do interest rates matter", NOT "fed rate decision".
+Spread across the channel's lanes (economics, science & space, nature & psychology).
+Skip sports, celebrities, crime, gossip, and anything only relevant this week.
 Return JSON only: {{"keywords": ["...", "..."]}}
 
 HEADLINES:
@@ -294,6 +297,7 @@ HEADLINES:
 
 def build_keywords(cfg, news):
     seeds = [k.strip() for k in cfg["seed_keywords"] if k.strip()]
+    n_seed, n_dyn = len(seeds), 0
     dyn = []
     if news and cfg["dynamic_keywords"] > 0:
         try:
@@ -301,14 +305,20 @@ def build_keywords(cfg, news):
                 profile=cfg["channel_profile"], seeds=", ".join(seeds) or "(none)", n=cfg["dynamic_keywords"],
                 headlines="\n".join(f"- {c['title']}" for c in news[:150])), cfg["gemini_models"], 0.3)
             dyn = [k.strip() for k in data.get("keywords", []) if isinstance(k, str) and k.strip()]
+            n_dyn = min(len(dyn), cfg["dynamic_keywords"])
         except Exception:
             HEALTH["Từ khóa AI"] = "lỗi"
     out, seen = [], set()
-    for k in dyn[: cfg["dynamic_keywords"]] + seeds:  # tu khoa thoi su uu tien truoc
+    dyn = dyn[: cfg["dynamic_keywords"]]
+    mixed = []  # xen ke: 2 tu khoa goc (dai han) roi 1 tu khoa AI
+    while seeds or dyn:
+        mixed += seeds[:2] + dyn[:1]
+        seeds, dyn = seeds[2:], dyn[1:]
+    for k in mixed:
         if k.lower() not in seen:
             seen.add(k.lower())
             out.append(k)
-    HEALTH["Từ khóa"] = f"{len(seeds)} gốc + {len(dyn)} AI"
+    HEALTH["Từ khóa"] = f"{n_seed} gốc + {n_dyn} AI"
     return out
 
 
@@ -535,7 +545,8 @@ def collect_suggest(cfg, keywords):
     for kw in kws:
         try:
             yt_s = suggestions(kw, True)
-            g_s = suggestions(f"why {kw}", False)
+            q = kw if re.match(r"(why|how|what|when|where|who|is|are|do|does|can)\b", kw, re.I) else f"why {kw}"
+            g_s = suggestions(q, False)
         except Exception:
             failed += 1
             continue
@@ -703,14 +714,17 @@ TASK: Pick the {top} best VIDEO TOPICS for this channel. Rules:
 1. A topic must sustain a 25-30 minute data-driven explainer for a US audience. Skip celebrity gossip,
    sports results, crime, short-lived political fights.
 2. Prefer topics backed by several signals, especially across both branches. Merge signals about the same subject.
-3. A topic can be a timely hook ("why X just happened") or an evergreen question that is getting proven attention.
-4. Mix categories when quality allows (finance/economics AND science), but quality first.
-5. "why_hot" and "angle" in Vietnamese (1-2 short sentences each). "titles" in English, catchy, under 70 chars.
-6. "keyword": the main 2-5 word YouTube search keyword for this topic (English).
-7. "source_ids": 1-4 supporting IDs, most important first (may include "VIDIQ").
+3. Strongly prefer EVERGREEN curiosity questions (still searched in 2-3 years) that are getting proven attention.
+   News is only a hook: a timely event qualifies only if it opens a durable question
+   (e.g. "why do interest rates matter", not "what the Fed did this week").
+4. Each topic = ONE clear question a viewer has wondered about ("Why does...?", "What would happen if...?").
+5. Balance the channel's lanes (economics / science & space / nature & psychology): try to cover at least 2 lanes, quality first.
+6. "why_hot" and "angle" in Vietnamese (1-2 short sentences each). "titles" in English, catchy, under 70 chars.
+7. "keyword": the main 2-5 word YouTube search keyword for this topic (English).
+8. "source_ids": 1-4 supporting IDs, most important first (may include "VIDIQ").
 
 Return JSON only:
-{{"topics":[{{"topic":"short English topic name","category":"finance|economics|science|space|tech|history","why_hot":"...","angle":"...","titles":["...","..."],"keyword":"...","hotness":1-10,"fit":1-10,"evergreen":"cao|trung bình|thấp","source_ids":["S1"]}}]}}
+{{"topics":[{{"topic":"short English topic name","category":"economics|science & space|nature & psychology","why_hot":"...","angle":"...","titles":["...","..."],"keyword":"...","hotness":1-10,"fit":1-10,"evergreen":"cao|trung bình|thấp","source_ids":["S1"]}}]}}
 """
 
 CHECK_PROMPT = """Here are {n} YouTube video topics (numbered) and raw vidIQ data: a keyword check for topic 1
