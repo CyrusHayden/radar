@@ -1,0 +1,5 @@
+RADAR_CONFIG.yaml
+VIDIQ_AUTH.txt
+vidiq_tools.json
+.env
+__pycache__/

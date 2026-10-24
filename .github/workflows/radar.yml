@@ -1,0 +1,43 @@
+name: topic-radar
+
+on:
+  schedule:
+    - cron: "17 0 * * 1,3,5"   # 07:17 gio VN, Thu 2 / Thu 4 / Thu 6
+  workflow_dispatch: {}        # nut "Run workflow" de chay tay
+
+permissions:
+  contents: write
+
+concurrency:
+  group: topic-radar
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run radar
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          STATE_KEY: ${{ secrets.STATE_KEY }}
+          RADAR_CONFIG: ${{ secrets.RADAR_CONFIG }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          VIDIQ_AUTH: ${{ secrets.VIDIQ_AUTH }}
+        run: python radar.py
+      - name: Save encrypted state
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add state.enc 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "update state" && git push)
