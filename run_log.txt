@@ -1,0 +1,16 @@
+=== 2026-10-24 12:29 (gio VN) · workflow_dispatch · OK ===
+[    3s] tin tuc: 122 tin
+[   88s] tu khoa: 23
+[   97s] youtube: 23 outlier
+[   98s] reddit: 0 bai
+[  100s] goi y tim kiem: 10
+[  101s] vidiq: ket noi OK, 70 cong cu
+[  101s] vidiq kham pha: OK 1739 ky tu
+[  101s] tong tin hieu sau loc trung: 140
+[  222s] gemini (gemini-3.8-flash) chon 5 chu de
+[  222s] vidiq kiem tra: OK
+[  270s] da gui 2/2 tin Telegram
+[  270s] da luu state · kenh tu hoc dang theo doi: 0 · vidiq: 2 luot goi
+[  270s] ket thuc sau 270s
+nguon: Google Trends: 10 từ khóa · Google News: 36 tin · Science: 36 tin · Hacker News: 40 bài · Từ khóa: 15 gốc + 8 AI · YouTube: 487 video tìm được → 23 outlier; theo dõi 0 kênh (0 tự học) → 0 outlier · Reddit: 0 bài (không OAuth), lỗi 10/10 lượt tìm · Gợi ý tìm kiếm: 10 từ khóa · vidIQ: 2 lượt gọi, còn 260 credit
+
