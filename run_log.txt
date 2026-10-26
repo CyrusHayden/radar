@@ -14,3 +14,18 @@
 [  270s] ket thuc sau 270s
 nguon: Google Trends: 10 từ khóa · Google News: 36 tin · Science: 36 tin · Hacker News: 40 bài · Từ khóa: 15 gốc + 8 AI · YouTube: 487 video tìm được → 23 outlier; theo dõi 0 kênh (0 tự học) → 0 outlier · Reddit: 0 bài (không OAuth), lỗi 10/10 lượt tìm · Gợi ý tìm kiếm: 10 từ khóa · vidIQ: 2 lượt gọi, còn 260 credit
 
+=== 2026-10-26 11:47 (gio VN) · schedule · OK ===
+[    3s] tin tuc: 132 tin
+[  567s] tu khoa: 23
+[  583s] youtube: 33 outlier
+[  583s] reddit: 0 bai
+[  585s] goi y tim kiem: 10
+[  585s] vidiq: ket noi OK, 70 cong cu
+[  586s] vidiq kham pha: OK 2251 ky tu
+[  586s] tong tin hieu sau loc trung: 160
+[  732s] gemini LOI (list indices must be integers or slices, not str) -> gui danh sach tho
+[  735s] da gui 1/1 tin Telegram
+[  735s] da luu state · kenh tu hoc dang theo doi: 12 · vidiq: 1 luot goi
+[  735s] ket thuc sau 735s
+nguon: Google Trends: 10 từ khóa · News Economics: 36 tin · News Science & space: 46 tin · News Nature & psychology: 40 tin · Từ khóa: 15 gốc + 8 AI · YouTube: 521 video tìm được → 18 outlier; theo dõi 12 kênh (12 tự học) → 34 outlier · Reddit: 0 bài (không OAuth), lỗi 10/10 lượt tìm · Gợi ý tìm kiếm: 10 từ khóa · vidIQ: 1 lượt gọi, còn 255 credit
+
