@@ -221,16 +221,29 @@ def esc(s):
 
 
 # ================================================================ Gemini
-def ask_gemini(prompt, models, temperature=0.4):
+def check_topics(data):
+    """Chap nhan ca {"topics": [...]} lan danh sach tron [...]; sai mau -> ValueError."""
+    if isinstance(data, dict):
+        data = data.get("topics")
+    if not isinstance(data, list) or not data or not all(isinstance(t, dict) for t in data):
+        raise ValueError('expected {"topics": [ {...}, ... ]} - a non-empty list of topic objects')
+    return data
+
+
+def ask_gemini(prompt, models, temperature=0.4, check=None):
+    """check(data) -> data da chuan hoa, hoac raise ValueError. Neu sai mau: bao lai cho CHINH model do
+    de sua 1 lan; van sai -> chuyen sang model ke tiep."""
     key = os.environ.get("GEMINI_API_KEY")
     if not key:
         raise RuntimeError("thieu GEMINI_API_KEY")
-    body = {"contents": [{"role": "user", "parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json", "temperature": temperature}}
     last = None
     for model in models:
+        contents = [{"role": "user", "parts": [{"text": prompt}]}]
+        fixed = False
         for attempt in range(3):
             try:
+                body = {"contents": contents,
+                        "generationConfig": {"responseMimeType": "application/json", "temperature": temperature}}
                 r = requests.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
                     headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=body, timeout=180)
@@ -244,7 +257,25 @@ def ask_gemini(prompt, models, temperature=0.4):
                 parts = r.json()["candidates"][0]["content"]["parts"]
                 text = "".join(p.get("text", "") for p in parts).strip()
                 text = re.sub(r"^```(?:json)?|```$", "", text).strip()
-                return json.loads(text), model
+                data = json.loads(text)
+                if check:
+                    try:
+                        data = check(data)
+                    except ValueError as ve:
+                        shape = type(data).__name__
+                        last = f"{model}: sai mau ({shape}: {clean(str(ve), 60)})"
+                        if fixed:
+                            log(f"{model} van sai mau sau khi nhac -> doi model")
+                            break
+                        fixed = True
+                        log(f"{model} tra sai mau ({shape}) -> nhac model sua lai")
+                        contents = contents + [
+                            {"role": "model", "parts": [{"text": text[:20000]}]},
+                            {"role": "user", "parts": [{"text":
+                                f"Your reply has the wrong format: {ve}. Return the corrected answer again, "
+                                f"JSON only, following exactly the format requested in the first message."}]}]
+                        continue
+                return data, model
             except Exception as e:
                 last = f"{model}: {type(e).__name__}"
                 time.sleep(3)
@@ -933,8 +964,8 @@ def main():
 
     topics = []
     try:
-        data, model = ask_gemini(prompt, cfg["gemini_models"])
-        topics = data["topics"][: cfg["top_n"]]
+        data, model = ask_gemini(prompt, cfg["gemini_models"], check=check_topics)
+        topics = data[: cfg["top_n"]]
         log(f"gemini ({model}) chon {len(topics)} chu de")
         # 6. vidIQ kiem tra lan cuoi
         if vq.client and topics:
