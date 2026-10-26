@@ -7,7 +7,6 @@ Luong chay:
   3. Nhanh co ban (mien phi):
        - YouTube: tim video theo tu khoa -> cham outlier (views / subscriber)
          + quet cac kenh "tu hoc" (kenh nao outlier >= 2 lan thi tu theo doi)
-       - Reddit: tim toan Reddit theo tu khoa
        - Goi y tim kiem YouTube/Google (nguoi ta dang go tim gi)
   4. Nhanh vidIQ (goi 1): hoi vidIQ chu de/xu huong dang len trong ngach
   5. Gemini gop 2 nhanh -> top 5
@@ -92,7 +91,6 @@ DEFAULT_CONFIG = {
         "learn_min_hits": 2, "learn_window_days": 60, "watch_max": 40,
         "watch_window_days": 21, "watch_min_ratio": 2.0, "channels": [],
     },
-    "reddit": {"search_keywords": 10, "per_keyword": 5, "min_score": 100},
     "suggest": {"keywords": 10},
     "vidiq": {
         "enabled": True, "max_calls": 2,
@@ -550,58 +548,7 @@ def own_channel_titles(cfg):
         return []
 
 
-# ================================================================ 3b. Reddit (tim toan Reddit)
-def reddit_token():
-    cid, sec = os.environ.get("REDDIT_CLIENT_ID"), os.environ.get("REDDIT_CLIENT_SECRET")
-    if not (cid and sec):
-        return None
-    r = requests.post("https://www.reddit.com/api/v1/access_token", auth=(cid, sec),
-                      data={"grant_type": "client_credentials"}, headers={"User-Agent": UA}, timeout=20)
-    r.raise_for_status()
-    return r.json()["access_token"]
-
-
-def collect_reddit(cfg, keywords):
-    rcfg = cfg["reddit"]
-    try:
-        token = reddit_token()
-    except Exception:
-        token = None
-    base = "https://oauth.reddit.com/search" if token else "https://www.reddit.com/search.json"
-    headers = {"Authorization": f"bearer {token}"} if token else {}
-    cutoff = NOW - timedelta(days=7)
-    cands, failed, seen = [], 0, set()
-    kws = keywords[: rcfg["search_keywords"]]
-    for kw in kws:
-        try:
-            r = http_get(base, params={"q": kw, "sort": "top", "t": "week", "limit": 25, "type": "link"},
-                         headers=dict(headers))
-            r.raise_for_status()
-            posts = [p["data"] for p in r.json()["data"]["children"]]
-        except Exception:
-            failed += 1
-            continue
-        n = 0
-        for p in posts:
-            if p.get("over_18") or p.get("score", 0) < rcfg["min_score"] or p["permalink"] in seen:
-                continue
-            if datetime.fromtimestamp(p["created_utc"], timezone.utc) < cutoff:
-                continue
-            seen.add(p["permalink"])
-            cands.append({"source": "Reddit", "title": p["title"], "url": "https://www.reddit.com" + p["permalink"],
-                          "metric": f"r/{p.get('subreddit', '?')}: {fmt_num(p['score'])} upvotes, "
-                                    f"{fmt_num(p.get('num_comments', 0))} comments",
-                          "snippet": clean(p.get("selftext"), 160), "label": f"r/{p.get('subreddit', '?')}",
-                          "weight": p["score"]})
-            n += 1
-            if n >= rcfg["per_keyword"]:
-                break
-    HEALTH["Reddit"] = f"{len(cands)} bài ({'OAuth' if token else 'không OAuth'})" + \
-                       (f", lỗi {failed}/{len(kws)} lượt tìm" if failed else "")
-    return cands
-
-
-# ================================================================ 3c. goi y tim kiem
+# ================================================================ 3b. goi y tim kiem
 def suggestions(q, youtube):
     params = {"client": "firefox", "q": q, "hl": "en", "gl": "us"}
     if youtube:
@@ -775,7 +722,6 @@ Two research branches were collected in the last few days.
 
 BRANCH A - raw signals, each with an ID:
 - "YouTube" = videos far above normal (views vs subscribers, or vs the channel's median) -> proven demand.
-- "Reddit" = what US communities discuss / ask.
 - "Search suggest" = what people type into YouTube/Google search.
 - "News Economics" / "News Science & space" / "News Nature & psychology" = major US/UK outlets (NYT, NPR, BBC,
   CNBC, USA Today, Guardian, Scientific American, National Geographic, Smithsonian). "Google Trends" = what the US searches today.
@@ -905,11 +851,9 @@ def main():
     # 3. nhanh co ban
     yt_c = collect_youtube(cfg, keywords, state)
     log(f"youtube: {len(yt_c)} outlier")
-    rd_c = collect_reddit(cfg, keywords)
-    log(f"reddit: {len(rd_c)} bai")
     sg_c = collect_suggest(cfg, keywords)
     log(f"goi y tim kiem: {len(sg_c)}")
-    cands = yt_c + rd_c + sg_c + news
+    cands = yt_c + sg_c + news
     # 4. nhanh vidIQ
     vq = VidIQBranch(cfg, state)
     vq_text = "(vidIQ not available this run)"
@@ -988,9 +932,8 @@ def main():
         msgs = build_messages(topics, by_id, header, footer(model))
     except Exception as e:
         log(f"gemini LOI ({clean(str(e), 80)}) -> gui danh sach tho")
-        top_yt = sorted([c for c in uniq if c["source"] == "YouTube"], key=lambda c: -c["weight"])[:6]
-        top_rd = sorted([c for c in uniq if c["source"] == "Reddit"], key=lambda c: -c["weight"])[:4]
-        lines = [f'• <a href="{html.escape(c["url"])}">{esc(c["title"])}</a> — {esc(c["metric"])}' for c in top_yt + top_rd]
+        top_yt = sorted([c for c in uniq if c["source"] == "YouTube"], key=lambda c: -c["weight"])[:10]
+        lines = [f'• <a href="{html.escape(c["url"])}">{esc(c["title"])}</a> — {esc(c["metric"])}' for c in top_yt]
         msgs = [header + f"\n\n⚠️ AI lỗi ({esc(e)}), đây là tín hiệu mạnh nhất chưa lọc:\n\n" + "\n".join(lines)
                 + "\n\n" + footer(None)]
         topics = []

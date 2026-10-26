@@ -31,8 +31,6 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           STATE_KEY: ${{ secrets.STATE_KEY }}
           RADAR_CONFIG: ${{ secrets.RADAR_CONFIG }}
-          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
-          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
           VIDIQ_AUTH: ${{ secrets.VIDIQ_AUTH }}
         run: python radar.py
       - name: Save encrypted state + run log

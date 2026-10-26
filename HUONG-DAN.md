@@ -8,7 +8,6 @@ Bot chạy **Thứ 2 và Thứ 5 lúc khoảng 7:17 sáng** (giờ VN) trên Git
 3. **Nhánh cơ bản:**
    - **YouTube:** tìm video 14 ngày gần nhất theo từ khóa, lọc video nào có lượt xem ≥ số subscriber của kênh (outlier).
    - **Tự học:** kênh nào lọt outlier ≥ 2 lần thì bot tự theo dõi (tối đa 40 kênh).
-   - **Reddit:** tìm toàn Reddit theo từ khóa.
    - **Gợi ý tìm kiếm:** những gì người ta gõ trên YouTube/Google.
 4. **Nhánh vidIQ, lần gọi 1:** hỏi vidIQ chủ đề và xu hướng đang lên.
 5. **Gemini:** gộp hai nhánh và chọn top 5.
@@ -68,8 +67,6 @@ Trong repo, vào **Settings → Secrets and variables → Actions → New reposi
 | `STATE_KEY` | Tự đặt một mật khẩu dài, **không đổi về sau** (đổi thì bot mất lịch sử và các kênh tự học) |
 | `RADAR_CONFIG` | Toàn bộ nội dung `RADAR_CONFIG.yaml` |
 | `VIDIQ_AUTH` | Toàn bộ nội dung `VIDIQ_AUTH.txt` |
-
-Reddit là tùy chọn: vào https://www.reddit.com/prefs/apps, chọn **create app**, loại **script**, phần redirect uri ghi `http://localhost`. Thêm `REDDIT_CLIENT_ID` (dãy ký tự dưới tên app) và `REDDIT_CLIENT_SECRET`. Nếu không có, bot vẫn thử đọc Reddit, nhưng có thể bị chặn.
 
 ## Bước 6. Chạy thử
 Vào **Actions → topic-radar → Run workflow**. Khoảng 2–3 phút sau, tin sẽ tới Telegram.
