@@ -60,3 +60,18 @@ nguon: Google Trends: 10 từ khóa · News Economics: 36 tin · News Science & 
 [  584s] ket thuc sau 584s
 nguon: Google Trends: 10 từ khóa · News Economics: 45 tin · News Science & space: 45 tin · News Nature & psychology: 40 tin · Từ khóa: 15 gốc + 8 AI · YouTube: 550 video tìm được → 26 outlier; theo dõi 15 kênh (15 tự học) → 44 outlier · Gợi ý tìm kiếm: 10 từ khóa · vidIQ: 2 lượt gọi, còn 235 credit
 
+=== 2026-11-05 13:46 (gio VN) · schedule · OK ===
+[    4s] tin tuc: 133 tin
+[   86s] tu khoa: 23
+[  101s] youtube: 43 outlier
+[  102s] goi y tim kiem: 10
+[  103s] vidiq: ket noi OK, 72 cong cu
+[  104s] vidiq kham pha: OK 1899 ky tu
+[  104s] tong tin hieu sau loc trung: 173
+[  305s] gemini (gemini-3.5-flash) chon 5 chu de
+[  306s] vidiq kiem tra: OK
+[  761s] da gui 2/2 tin Telegram
+[  761s] da luu state · kenh tu hoc dang theo doi: 20 · vidiq: 2 luot goi
+[  761s] ket thuc sau 761s
+nguon: Google Trends: 10 từ khóa · News Economics: 41 tin · News Science & space: 40 tin · News Nature & psychology: 42 tin · Từ khóa: 15 gốc + 8 AI · YouTube: 507 video tìm được → 28 outlier; theo dõi 20 kênh (20 tự học) → 54 outlier · Gợi ý tìm kiếm: 10 từ khóa · vidIQ: 2 lượt gọi, còn 210 credit
+
