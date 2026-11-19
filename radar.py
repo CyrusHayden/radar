@@ -49,6 +49,15 @@ HEALTH = {}  # ten nguon -> ghi chu (chi gui vao Telegram, khong in log)
 RUN_LOG_FILE = os.path.join(ROOT, "run_log.txt")
 RUNLOG = []  # nhat ky moi lan chay -> run_log.txt (repo public: CHI so lieu, khong tu khoa/chu de)
 T0 = time.time()
+# Dong ho an toan (GitHub huy job o phut 30):
+SOFT_LIMIT = 11 * 60   # qua moc nay: bo buoc phu (vidIQ kiem tra + Gemini xep lai), gui Telegram luon
+HARD_LIMIT = 22 * 60   # qua moc nay: thoi goi Gemini, gui danh sach tho
+GEMINI_CALL_TIMEOUT = 90  # moi lan goi Gemini cho toi da 90s (truoc la 180s)
+WATCH_CAP = 25         # toi da 25 kenh tu hoc, giu kenh "hot" nhat
+
+
+def elapsed():
+    return time.time() - T0
 
 
 def log(msg):
@@ -239,12 +248,15 @@ def ask_gemini(prompt, models, temperature=0.4, check=None):
         contents = [{"role": "user", "parts": [{"text": prompt}]}]
         fixed = False
         for attempt in range(3):
+            left = HARD_LIMIT - elapsed()
+            if left < 20:
+                raise RuntimeError(f"het thoi gian ({last or 'chua goi duoc'})")
             try:
                 body = {"contents": contents,
                         "generationConfig": {"responseMimeType": "application/json", "temperature": temperature}}
                 r = requests.post(
                     f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-                    headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=body, timeout=180)
+                    headers={"x-goog-api-key": key, "Content-Type": "application/json"}, json=body, timeout=min(GEMINI_CALL_TIMEOUT, left))
                 if r.status_code in (429, 500, 503):
                     last = f"{model}: HTTP {r.status_code}"
                     time.sleep(10 * (attempt + 1))
@@ -491,7 +503,7 @@ def watchlist(cfg, state):
             del state["channels"][cid]
     learned = [cid for cid, ch in state["channels"].items() if len(ch["hits"]) >= ycfg["learn_min_hits"]]
     learned.sort(key=lambda c: (len(state["channels"][c]["hits"]), max(state["channels"][c]["hits"])), reverse=True)
-    return learned[: ycfg["watch_max"]]
+    return learned[: min(ycfg["watch_max"], WATCH_CAP)]
 
 
 def scan_channels(cfg, cids, skip_urls):
@@ -912,7 +924,10 @@ def main():
         topics = data[: cfg["top_n"]]
         log(f"gemini ({model}) chon {len(topics)} chu de")
         # 6. vidIQ kiem tra lan cuoi
-        if vq.client and topics:
+        if vq.client and topics and elapsed() > SOFT_LIMIT:
+            log(f"da chay {elapsed():.0f}s > {SOFT_LIMIT}s -> bo qua vidiq kiem tra, gui luon")
+            vq.note += " bỏ qua kiểm tra cuối vì chạy lâu;"
+        elif vq.client and topics:
             got = vq.check(topics)
             log(f"vidiq kiem tra: {'OK' if got else 'khong co ket qua'}")
             if got:
@@ -948,12 +963,21 @@ def main():
         log(f"da luu state · kenh tu hoc dang theo doi: {len(watchlist(cfg, state))} · vidiq: {vq.client.calls if vq.client else 0} luot goi")
 
 
+def _on_term(signum, frame):
+    raise KeyboardInterrupt
+
+
 if __name__ == "__main__":
+    import signal
+    signal.signal(signal.SIGTERM, _on_term)
     code = 0
     try:
         main()
     except SystemExit as e:
         code = e.code or 0
+    except KeyboardInterrupt:
+        log("BI HUY giua chung (GitHub dung job)")
+        code = 1
     except Exception as e:  # khong in traceback (repo public)
         log(f"LOI: {type(e).__name__} o {e.__traceback__.tb_next.tb_frame.f_code.co_name if e.__traceback__.tb_next else '?'}")
         code = 1
